@@ -1,0 +1,19 @@
+# Address and port for the HTTP server.
+host 127.0.0.1
+port 5000
+
+# Files are stored in the app root by default. Set this to keep store.json and
+# list.json elsewhere.
+# data-dir data
+
+# Optional explicit MaxMind-compatible DB-IP country Lite database.
+# geoip-database dbip-country-lite.mmdb
+
+reject-private-addresses true
+allow-update-without-old true
+purge-time 3h
+debug false
+
+# Repeat these directives as needed.
+# banned-ip 203.0.113.10
+# banned-server example.org/30000
