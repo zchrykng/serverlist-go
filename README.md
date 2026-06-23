@@ -62,6 +62,14 @@ https://download.db-ip.com/free/dbip-country-lite-YYYY-MM.mmdb.gz
 The repository includes two workflows:
 
 - `CI`: runs `go test ./...` and verifies the Docker image builds on pull requests and pushes to `main` or `master`.
-- `Docker Publish`: builds and pushes a multi-arch image to GitHub Container Registry as `ghcr.io/<owner>/<repo>` on pushes to `main` or `master`, semver tags, published releases, and manual dispatches.
+- `Docker Publish`: increments the latest `vX.Y.Z` git tag by one patch version, creates the new git tag, and pushes a multi-arch image to GitHub Container Registry as `ghcr.io/<owner>/<repo>` on pushes to `main` or `master` and manual dispatches. Published GitHub releases use the release tag as the image version.
 
 The publish workflow uses the built-in `GITHUB_TOKEN` with `packages: write`, so no registry secret is needed for GHCR in the same repository.
+
+Published image tags include:
+
+- `X.Y.Z`
+- `vX.Y.Z`
+- `X.Y`
+- `sha-<short-sha>`
+- `latest`
