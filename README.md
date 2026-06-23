@@ -2,6 +2,22 @@
 
 Go port of the Luanti server list service.
 
+## Development
+
+The Go application source lives under `src/`.
+
+Run tests:
+
+```sh
+go test ./...
+```
+
+Run locally:
+
+```sh
+go run ./src
+```
+
 ## Docker
 
 Build the image:
