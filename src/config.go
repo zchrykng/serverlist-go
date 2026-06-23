@@ -18,6 +18,7 @@ type Config struct {
 	RejectPrivateAddresses bool
 	AllowUpdateWithoutOld  bool
 	TrustProxyHeaders      bool
+	LogRawRequests         bool
 	BannedIPs              map[string]struct{}
 	BannedServers          map[string]struct{}
 	PurgeTime              time.Duration
@@ -61,6 +62,7 @@ func LoadConfig(path string) (*Config, error) {
 			RejectPrivateAddresses *bool    `scfg:"reject-private-addresses"`
 			AllowUpdateWithoutOld  *bool    `scfg:"allow-update-without-old"`
 			TrustProxyHeaders      *bool    `scfg:"trust-proxy-headers"`
+			LogRawRequests         *bool    `scfg:"log-raw-requests"`
 			BannedIP               []string `scfg:"banned-ip"`
 			BannedServer           []string `scfg:"banned-server"`
 			PurgeTime              string   `scfg:"purge-time"`
@@ -90,6 +92,9 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		if raw.TrustProxyHeaders != nil {
 			cfg.TrustProxyHeaders = *raw.TrustProxyHeaders
+		}
+		if raw.LogRawRequests != nil {
+			cfg.LogRawRequests = *raw.LogRawRequests
 		}
 		if raw.Debug != nil {
 			cfg.Debug = *raw.Debug
@@ -134,6 +139,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v, ok := boolFromEnv("SERVERLIST_TRUST_PROXY_HEADERS"); ok {
 		cfg.TrustProxyHeaders = v
+	}
+	if v, ok := boolFromEnv("SERVERLIST_LOG_RAW_REQUESTS"); ok {
+		cfg.LogRawRequests = v
 	}
 }
 

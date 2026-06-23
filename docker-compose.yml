@@ -13,6 +13,8 @@ services:
       # Set to "true" when this container is behind a trusted reverse proxy
       # that sets X-Forwarded-For or X-Real-IP.
       SERVERLIST_TRUST_PROXY_HEADERS: "true"
+      # Temporarily enable this while debugging announce request formatting.
+      SERVERLIST_LOG_RAW_REQUESTS: "false"
       SERVERLIST_DOWNLOAD_GEOIP: "true"
       SERVERLIST_REQUIRE_GEOIP: "false"
       SERVERLIST_UID: "1000"

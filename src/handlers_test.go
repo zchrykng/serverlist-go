@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +92,33 @@ func TestRemoteIPFallsBackToRealIPWhenForwardedForInvalid(t *testing.T) {
 
 	if got := state.remoteIP(req); got != "198.51.100.9" {
 		t.Fatalf("remoteIP = %q, want X-Real-IP", got)
+	}
+}
+
+func TestLogRawAnnounceRequestRestoresBody(t *testing.T) {
+	var logs bytes.Buffer
+	state := &appState{
+		config: &Config{LogRawRequests: true},
+		logger: log.New(&logs, "", 0),
+	}
+	req := httptest.NewRequest(http.MethodPost, "/announce", strings.NewReader("json=%7B%7D"))
+	req.RemoteAddr = "127.0.0.1:12345"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err := state.logRawAnnounceRequest(req, "127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "json=%7B%7D" {
+		t.Fatalf("restored body = %q", body)
+	}
+	if !strings.Contains(logs.String(), `raw_body="json=%7B%7D"`) {
+		t.Fatalf("raw log missing body: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), `Content-Type=["application/x-www-form-urlencoded"]`) {
+		t.Fatalf("raw log missing content type header: %s", logs.String())
 	}
 }

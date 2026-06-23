@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -54,6 +57,9 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := a.remoteIP(r)
+	if err := a.logRawAnnounceRequest(r, ip); err != nil {
+		a.logger.Printf("raw announce logging failed: client_ip=%s peer=%s error=%v", ip, r.RemoteAddr, err)
+	}
 	if _, banned := a.config.BannedIPs[ip]; banned {
 		a.reject(w, r, http.StatusForbidden, "", 0, "banned_ip", "Banned (IP).")
 		return
@@ -190,6 +196,58 @@ func (a *appState) reject(w http.ResponseWriter, r *http.Request, status int, ac
 	a.logger.Printf("request rejected: status=%d reason=%s method=%s path=%s client_ip=%s peer=%s action=%s port=%d response=%q",
 		status, reason, r.Method, r.URL.Path, clientIP, r.RemoteAddr, action, port, firstLine(text))
 	http.Error(w, text, status)
+}
+
+func (a *appState) logRawAnnounceRequest(r *http.Request, clientIP string) error {
+	if a.config == nil || !a.config.LogRawRequests {
+		return nil
+	}
+
+	var body []byte
+	if r.Body != nil {
+		var err error
+		body, err = io.ReadAll(io.LimitReader(r.Body, 64*1024+1))
+		if err != nil {
+			return err
+		}
+		if err := r.Body.Close(); err != nil {
+			return err
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+	}
+
+	truncated := false
+	if len(body) > 64*1024 {
+		body = body[:64*1024]
+		truncated = true
+	}
+
+	a.logger.Printf("raw announce request: method=%s path=%s client_ip=%s peer=%s content_type=%q content_length=%d transfer_encoding=%q headers=%s body_len=%d body_truncated=%t raw_body=%q",
+		r.Method, r.URL.RequestURI(), clientIP, r.RemoteAddr, r.Header.Get("Content-Type"), r.ContentLength,
+		strings.Join(r.TransferEncoding, ","), formatHeadersForLog(r.Header), len(body), truncated, string(body))
+	return nil
+}
+
+func formatHeadersForLog(headers http.Header) string {
+	if len(headers) == 0 {
+		return "{}"
+	}
+	names := make([]string, 0, len(headers))
+	for name := range headers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		lower := strings.ToLower(name)
+		if lower == "authorization" || lower == "cookie" || lower == "set-cookie" {
+			parts = append(parts, fmt.Sprintf("%s=<redacted>", name))
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%q", name, headers.Values(name)))
+	}
+	return "{" + strings.Join(parts, " ") + "}"
 }
 
 func firstLine(s string) string {

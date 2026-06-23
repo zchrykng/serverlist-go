@@ -12,6 +12,7 @@ data-dir /data
 reject-private-addresses true
 allow-update-without-old true
 trust-proxy-headers false
+log-raw-requests false
 purge-time 3h
 debug false
 

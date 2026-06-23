@@ -45,6 +45,7 @@ Runtime environment variables:
 - `PUID` / `PGID`: aliases for `SERVERLIST_UID` / `SERVERLIST_GID`.
 - `SERVERLIST_GEOIP_DATABASE`: MMDB path. Defaults to `/data/dbip-country-lite.mmdb`.
 - `SERVERLIST_TRUST_PROXY_HEADERS`: use `X-Forwarded-For` / `X-Real-IP` as the requester IP. Enable only behind a trusted reverse proxy.
+- `SERVERLIST_LOG_RAW_REQUESTS`: log raw `/announce` request headers and bodies for debugging. Defaults to `false`.
 - `SERVERLIST_DOWNLOAD_GEOIP`: download the DB-IP country Lite MMDB if missing. Defaults to `true`.
 - `SERVERLIST_GEOIP_URL`: override the MMDB `.gz` download URL.
 - `SERVERLIST_REQUIRE_GEOIP`: fail startup if GeoIP download fails. Defaults to `false`.
