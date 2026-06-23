@@ -2,12 +2,12 @@
 host 127.0.0.1
 port 5000
 
-# Files are stored in the app root by default. Set this to keep store.json and
-# list.json elsewhere.
-# data-dir data
+# Files are stored in /data by default. This is where store.json, list.json,
+# and the downloaded GeoIP database should live in container deployments.
+data-dir /data
 
 # Optional explicit MaxMind-compatible DB-IP country Lite database.
-# geoip-database dbip-country-lite.mmdb
+# geoip-database /data/dbip-country-lite.mmdb
 
 reject-private-addresses true
 allow-update-without-old true

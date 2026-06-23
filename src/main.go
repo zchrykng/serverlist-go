@@ -20,7 +20,12 @@ type appState struct {
 func main() {
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
-	cfg, err := LoadConfig("config.scfg")
+	configPath := os.Getenv("SERVERLIST_CONFIG")
+	if configPath == "" {
+		configPath = "config.scfg"
+	}
+
+	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		logger.Fatalf("failed to load config: %v", err)
 	}

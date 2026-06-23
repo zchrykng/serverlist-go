@@ -1,0 +1,21 @@
+services:
+  serverlist:
+    image: ghcr.io/your-github-owner/serverlist-go:latest
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      SERVERLIST_HOST: 0.0.0.0
+      SERVERLIST_PORT: "5000"
+      SERVERLIST_CONFIG: /data/config.scfg
+      SERVERLIST_DATA_DIR: /data
+      SERVERLIST_GEOIP_DATABASE: /data/dbip-country-lite.mmdb
+      SERVERLIST_DOWNLOAD_GEOIP: "true"
+      SERVERLIST_REQUIRE_GEOIP: "false"
+      SERVERLIST_UID: "1000"
+      SERVERLIST_GID: "1000"
+    volumes:
+      - serverlist-data:/data
+
+volumes:
+  serverlist-data:

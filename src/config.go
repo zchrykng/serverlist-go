@@ -32,6 +32,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Host:                   "127.0.0.1",
 		Port:                   "5000",
+		DataDir:                "/data",
 		RejectPrivateAddresses: true,
 		AllowUpdateWithoutOld:  true,
 		BannedIPs:              make(map[string]struct{}),

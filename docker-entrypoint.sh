@@ -3,13 +3,15 @@ set -eu
 
 SERVERLIST_UID="${SERVERLIST_UID:-${PUID:-1000}}"
 SERVERLIST_GID="${SERVERLIST_GID:-${PGID:-1000}}"
-SERVERLIST_DATA_DIR="${SERVERLIST_DATA_DIR:-/var/lib/serverlist}"
+SERVERLIST_CONFIG="${SERVERLIST_CONFIG:-/data/config.scfg}"
+SERVERLIST_DATA_DIR="${SERVERLIST_DATA_DIR:-/data}"
 SERVERLIST_GEOIP_DATABASE="${SERVERLIST_GEOIP_DATABASE:-$SERVERLIST_DATA_DIR/dbip-country-lite.mmdb}"
 SERVERLIST_DOWNLOAD_GEOIP="${SERVERLIST_DOWNLOAD_GEOIP:-true}"
 SERVERLIST_REQUIRE_GEOIP="${SERVERLIST_REQUIRE_GEOIP:-false}"
 
 export SERVERLIST_DATA_DIR
 export SERVERLIST_GEOIP_DATABASE
+export SERVERLIST_CONFIG
 
 truthy() {
 	case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
@@ -74,6 +76,10 @@ finalize_geoip() {
 }
 
 mkdir -p "$SERVERLIST_DATA_DIR"
+if [ ! -e "$SERVERLIST_CONFIG" ] && [ -r /app/config.example.scfg ]; then
+	mkdir -p "$(dirname "$SERVERLIST_CONFIG")"
+	cp /app/config.example.scfg "$SERVERLIST_CONFIG"
+fi
 download_geoip
 finalize_geoip
 ensure_user

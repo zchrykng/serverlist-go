@@ -14,8 +14,9 @@ RUN apk add --no-cache ca-certificates su-exec
 
 ENV SERVERLIST_HOST=0.0.0.0 \
     SERVERLIST_PORT=5000 \
-    SERVERLIST_DATA_DIR=/var/lib/serverlist \
-    SERVERLIST_GEOIP_DATABASE=/var/lib/serverlist/dbip-country-lite.mmdb \
+    SERVERLIST_CONFIG=/data/config.scfg \
+    SERVERLIST_DATA_DIR=/data \
+    SERVERLIST_GEOIP_DATABASE=/data/dbip-country-lite.mmdb \
     SERVERLIST_DOWNLOAD_GEOIP=true \
     SERVERLIST_REQUIRE_GEOIP=false \
     SERVERLIST_UID=1000 \
@@ -26,7 +27,7 @@ COPY --from=build /out/serverlist-go /usr/local/bin/serverlist-go
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY config.example.scfg /app/config.example.scfg
 
-VOLUME ["/var/lib/serverlist"]
+VOLUME ["/data"]
 EXPOSE 5000
 
 ENTRYPOINT ["docker-entrypoint.sh"]
