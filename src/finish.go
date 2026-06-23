@@ -9,6 +9,7 @@ import (
 
 func (a *appState) finishRequest(server *Server) {
 	a.errorTracker.Remove(server.ErrorPK())
+	a.logger.Printf("verification started: client_ip=%s address=%s port=%d name=%q", server.IP, server.Address, server.Port, server.Meta["name"])
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(context.Background(), server.Address)
 	if err != nil {
@@ -38,6 +39,8 @@ func (a *appState) finishRequest(server *Server) {
 			server.VerifyLevel = 3
 		} else if (strings.Contains(server.IP, ":") && !haveV6) || (strings.Contains(server.IP, ".") && !haveV4) {
 			server.VerifyLevel = 2
+			a.logger.Printf("verification tolerated IP family mismatch: client_ip=%s address=%s port=%d have_ipv4=%t have_ipv6=%t verify_level=%d",
+				server.IP, server.Address, server.Port, haveV4, haveV6, server.VerifyLevel)
 		} else {
 			text := fmt.Sprintf("Requester IP %s does not match host %s", server.IP, server.Address)
 			if isDomain(server.Address) {
@@ -52,6 +55,8 @@ func (a *appState) finishRequest(server *Server) {
 			server.VerifyLevel = 1
 		}
 	}
+	a.logger.Printf("verification DNS complete: client_ip=%s address=%s port=%d resolved=%s verify_level=%d",
+		server.IP, server.Address, server.Port, resolvedIPs(addrs), server.VerifyLevel)
 
 	if a.serverList.CheckDuplicate(server) {
 		text := fmt.Sprintf("Server %s port %d already exists on the list", server.Address, server.Port)
@@ -63,6 +68,7 @@ func (a *appState) finishRequest(server *Server) {
 	if a.geoIP != nil && len(addrs) > 0 {
 		if continent := a.geoIP.LookupContinent(addrs[len(addrs)-1].IP.String()); continent != "" {
 			server.Meta["geo_continent"] = continent
+			a.logger.Printf("verification GeoIP complete: address=%s port=%d continent=%s", server.Address, server.Port, continent)
 		}
 	}
 
@@ -80,9 +86,12 @@ func (a *appState) finishRequest(server *Server) {
 		return
 	}
 	server.Meta["ping"] = float64(int(ping.Seconds()*100000+0.5)) / 100000
+	a.logger.Printf("verification ping complete: address=%s port=%d ping=%.5f", server.Address, server.Port, number(server.Meta["ping"]))
 
 	old := a.serverList.Update(server)
 	a.logChangedServer(old, server)
+	a.logger.Printf("verification complete: client_ip=%s address=%s port=%d verify_level=%d listed=true",
+		server.IP, server.Address, server.Port, server.VerifyLevel)
 }
 
 func (a *appState) logChangedServer(old *Server, newServer *Server) {
@@ -107,4 +116,12 @@ func abs(v int) int {
 		return -v
 	}
 	return v
+}
+
+func resolvedIPs(addrs []net.IPAddr) string {
+	values := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		values = append(values, addr.IP.String())
+	}
+	return strings.Join(values, ",")
 }

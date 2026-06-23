@@ -49,40 +49,40 @@ func (a *appState) geoIPHandler(w http.ResponseWriter, r *http.Request) {
 func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
-		http.Error(w, "Method not allowed.", http.StatusMethodNotAllowed)
+		a.reject(w, r, http.StatusMethodNotAllowed, "", 0, "method_not_allowed", "Method not allowed.")
 		return
 	}
 
 	ip := a.remoteIP(r)
 	if _, banned := a.config.BannedIPs[ip]; banned {
-		http.Error(w, "Banned (IP).", http.StatusForbidden)
+		a.reject(w, r, http.StatusForbidden, "", 0, "banned_ip", "Banned (IP).")
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Unable to process form data.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, "", 0, "form_parse_error", "Unable to process form data.")
 		return
 	}
 	jsonData := r.FormValue("json")
 	if jsonData == "" {
-		http.Error(w, "Missing JSON data.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, "", 0, "missing_json", "Missing JSON data.")
 		return
 	}
 	if len(jsonData) > 11*1024 {
-		http.Error(w, fmt.Sprintf("JSON data is too big (%d).", len(jsonData)), http.StatusRequestEntityTooLarge)
+		a.reject(w, r, http.StatusRequestEntityTooLarge, "", 0, "json_too_large", fmt.Sprintf("JSON data is too big (%d).", len(jsonData)))
 		return
 	}
 
 	var req map[string]any
 	if err := json.Unmarshal([]byte(jsonData), &req); err != nil {
-		http.Error(w, "Unable to process JSON data.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, "", 0, "json_decode_error", "Unable to process JSON data.")
 		return
 	}
 
 	action, _ := req["action"].(string)
 	delete(req, "action")
 	if action != "start" && action != "update" && action != "delete" {
-		http.Error(w, "Invalid action field.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, action, 0, "invalid_action", "Invalid action field.")
 		return
 	}
 
@@ -91,19 +91,20 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 		req["port"] = float64(30000)
 	}
 	if err := normalizePort(req); err != nil {
-		http.Error(w, "JSON data does not conform to schema.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, action, 0, "invalid_port", "JSON data does not conform to schema.")
 		return
 	}
 
 	port := int(req["port"].(float64))
 	if a.isServerBanned(ip, port, req) {
-		http.Error(w, "Banned (Server).", http.StatusForbidden)
+		a.reject(w, r, http.StatusForbidden, action, port, "banned_server", "Banned (Server).")
 		return
 	}
 
 	old := a.serverList.Get(ip, port)
 	if action == "delete" {
 		if old == nil {
+			a.logger.Printf("announce delete ignored: client_ip=%s peer=%s port=%d reason=not_found", ip, r.RemoteAddr, port)
 			writeText(w, http.StatusOK, "Server to remove not found.")
 			return
 		}
@@ -114,19 +115,21 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := checkRequestSchema(req); err != nil {
-		http.Error(w, "JSON data does not conform to schema.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, action, port, "schema_error", "JSON data does not conform to schema.")
 		return
 	}
 	if !checkRequest(req) {
-		http.Error(w, "Incorrect JSON data.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, action, port, "invalid_request", "Incorrect JSON data.")
 		return
 	}
 
 	uptime := int(req["uptime"].(float64))
 	if action == "update" && old == nil {
 		if a.config.AllowUpdateWithoutOld && uptime > 0 {
+			a.logger.Printf("announce update promoted to start: client_ip=%s peer=%s port=%d uptime=%d", ip, r.RemoteAddr, port, uptime)
 			action = "start"
 		} else {
+			a.logger.Printf("announce update ignored: client_ip=%s peer=%s port=%d reason=old_server_not_found", ip, r.RemoteAddr, port)
 			writeText(w, http.StatusOK, "Server to update not found.")
 			return
 		}
@@ -135,24 +138,28 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 	server := ServerFromRequest(req)
 	if action == "start" || old.Address != server.Address {
 		if errCode := a.checkRequestAddress(server); errCode != 0 {
-			http.Error(w, addressErrorHelpTexts[errCode], http.StatusBadRequest)
+			a.reject(w, r, http.StatusBadRequest, action, port, "address_"+addressErrorCodeName(errCode), addressErrorHelpTexts[errCode])
 			return
 		}
 	}
 	if action == "update" && int(old.Meta["uptime"].(float64)) > int(server.Meta["uptime"].(float64)) {
-		http.Error(w, "Detected non-monotonic uptime.", http.StatusBadRequest)
+		a.reject(w, r, http.StatusBadRequest, action, port, "non_monotonic_uptime", "Detected non-monotonic uptime.")
 		return
 	}
 
 	server.TrackUpdate(old, action == "update")
 	errInfo := a.errorTracker.Get(server.ErrorPK())
 	go a.finishRequest(server)
+	a.logger.Printf("announce accepted: action=%s client_ip=%s peer=%s address=%s port=%d name=%q clients=%d uptime=%d verify_pending=true",
+		action, ip, r.RemoteAddr, server.Address, server.Port, server.Meta["name"], int(number(server.Meta["clients"])), int(number(server.Meta["uptime"])))
 
 	if errInfo != nil {
 		prefix := "Request has been filed, but the previous one encountered an error:\n"
 		if errInfo.Warn {
 			prefix = "Request has been filed, but there is a warning from the previous one:\n"
 		}
+		a.logger.Printf("announce accepted with previous verification issue: client_ip=%s address=%s port=%d warn=%t issue=%q",
+			ip, server.Address, server.Port, errInfo.Warn, errInfo.Text)
 		writeText(w, http.StatusConflict, prefix+errInfo.Text)
 		return
 	}
@@ -173,6 +180,40 @@ func (a *appState) isServerBanned(ip string, port int, req map[string]any) bool 
 	}
 	_, ok := a.config.BannedServers[address]
 	return ok
+}
+
+func (a *appState) reject(w http.ResponseWriter, r *http.Request, status int, action string, port int, reason string, text string) {
+	clientIP := ""
+	if r != nil {
+		clientIP = a.remoteIP(r)
+	}
+	a.logger.Printf("request rejected: status=%d reason=%s method=%s path=%s client_ip=%s peer=%s action=%s port=%d response=%q",
+		status, reason, r.Method, r.URL.Path, clientIP, r.RemoteAddr, action, port, firstLine(text))
+	http.Error(w, text, status)
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+func addressErrorCodeName(code int) string {
+	switch code {
+	case addrIsPrivate:
+		return "private"
+	case addrIsInvalid:
+		return "invalid"
+	case addrIsInvalidPort:
+		return "invalid_port"
+	case addrIsUnicode:
+		return "unicode"
+	case addrIsExample:
+		return "example"
+	default:
+		return "unknown"
+	}
 }
 
 func (a *appState) remoteIP(r *http.Request) string {

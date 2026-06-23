@@ -57,6 +57,8 @@ func main() {
 	go state.runTimer()
 
 	addr := cfg.Host + ":" + cfg.Port
+	logger.Printf("configuration loaded: config=%s data_dir=%s geoip_database=%s reject_private_addresses=%t allow_update_without_old=%t trust_proxy_headers=%t",
+		configPath, cfg.DataDir, cfg.GeoIPDatabase, cfg.RejectPrivateAddresses, cfg.AllowUpdateWithoutOld, cfg.TrustProxyHeaders)
 	logger.Printf("listening on %s", addr)
 	if err := http.ListenAndServe(addr, state.routes()); err != nil {
 		logger.Fatal(err)
