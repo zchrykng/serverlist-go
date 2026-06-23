@@ -10,6 +10,9 @@ services:
       SERVERLIST_CONFIG: /data/config.scfg
       SERVERLIST_DATA_DIR: /data
       SERVERLIST_GEOIP_DATABASE: /data/dbip-country-lite.mmdb
+      # Set to "true" when this container is behind a trusted reverse proxy
+      # that sets X-Forwarded-For or X-Real-IP.
+      SERVERLIST_TRUST_PROXY_HEADERS: "true"
       SERVERLIST_DOWNLOAD_GEOIP: "true"
       SERVERLIST_REQUIRE_GEOIP: "false"
       SERVERLIST_UID: "1000"

@@ -33,7 +33,7 @@ func (a *appState) listJSON(w http.ResponseWriter, r *http.Request) {
 func (a *appState) geoIPHandler(w http.ResponseWriter, r *http.Request) {
 	continent := ""
 	if a.geoIP != nil {
-		continent = a.geoIP.LookupContinent(remoteIP(r))
+		continent = a.geoIP.LookupContinent(a.remoteIP(r))
 	}
 
 	w.Header().Set("Cache-Control", "private, max-age=604800")
@@ -53,7 +53,7 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := remoteIP(r)
+	ip := a.remoteIP(r)
 	if _, banned := a.config.BannedIPs[ip]; banned {
 		http.Error(w, "Banned (IP).", http.StatusForbidden)
 		return
@@ -175,12 +175,48 @@ func (a *appState) isServerBanned(ip string, port int, req map[string]any) bool 
 	return ok
 }
 
-func remoteIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
+func (a *appState) remoteIP(r *http.Request) string {
+	if a.config != nil && a.config.TrustProxyHeaders {
+		if ip := forwardedIP(r); ip != "" {
+			return ip
+		}
 	}
-	return strings.TrimPrefix(host, "::ffff:")
+	return directRemoteIP(r.RemoteAddr)
+}
+
+func forwardedIP(r *http.Request) string {
+	if value := r.Header.Get("X-Forwarded-For"); value != "" {
+		for _, part := range strings.Split(value, ",") {
+			if ip := normalizeIPString(strings.TrimSpace(part)); ip != "" {
+				return ip
+			}
+		}
+	}
+	if value := r.Header.Get("X-Real-IP"); value != "" {
+		return normalizeIPString(strings.TrimSpace(value))
+	}
+	return ""
+}
+
+func directRemoteIP(remoteAddr string) string {
+	return normalizeIPString(remoteAddr)
+}
+
+func normalizeIPString(value string) string {
+	if value == "" {
+		return ""
+	}
+	value = strings.TrimPrefix(value, "::ffff:")
+	host, _, err := net.SplitHostPort(value)
+	if err != nil {
+		host = value
+	}
+	host = strings.Trim(host, "[]")
+	host = strings.TrimPrefix(host, "::ffff:")
+	if net.ParseIP(host) == nil {
+		return ""
+	}
+	return host
 }
 
 func writeText(w http.ResponseWriter, status int, text string) {

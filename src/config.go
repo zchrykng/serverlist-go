@@ -17,6 +17,7 @@ type Config struct {
 	GeoIPDatabase          string
 	RejectPrivateAddresses bool
 	AllowUpdateWithoutOld  bool
+	TrustProxyHeaders      bool
 	BannedIPs              map[string]struct{}
 	BannedServers          map[string]struct{}
 	PurgeTime              time.Duration
@@ -59,6 +60,7 @@ func LoadConfig(path string) (*Config, error) {
 			GeoIPDatabase          string   `scfg:"geoip-database"`
 			RejectPrivateAddresses *bool    `scfg:"reject-private-addresses"`
 			AllowUpdateWithoutOld  *bool    `scfg:"allow-update-without-old"`
+			TrustProxyHeaders      *bool    `scfg:"trust-proxy-headers"`
 			BannedIP               []string `scfg:"banned-ip"`
 			BannedServer           []string `scfg:"banned-server"`
 			PurgeTime              string   `scfg:"purge-time"`
@@ -85,6 +87,9 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		if raw.AllowUpdateWithoutOld != nil {
 			cfg.AllowUpdateWithoutOld = *raw.AllowUpdateWithoutOld
+		}
+		if raw.TrustProxyHeaders != nil {
+			cfg.TrustProxyHeaders = *raw.TrustProxyHeaders
 		}
 		if raw.Debug != nil {
 			cfg.Debug = *raw.Debug
@@ -126,6 +131,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v, ok := boolFromEnv("SERVERLIST_REJECT_PRIVATE_ADDRESSES"); ok {
 		cfg.RejectPrivateAddresses = v
+	}
+	if v, ok := boolFromEnv("SERVERLIST_TRUST_PROXY_HEADERS"); ok {
+		cfg.TrustProxyHeaders = v
 	}
 }
 

@@ -29,6 +29,7 @@ data-dir data
 geoip-database geo.mmdb
 reject-private-addresses false
 allow-update-without-old false
+trust-proxy-headers false
 banned-ip 198.51.100.9
 banned-server Example.Org/30000
 purge-time 45m
@@ -42,6 +43,7 @@ debug true
 	t.Setenv("SERVERLIST_HOST", "127.0.0.2")
 	t.Setenv("SERVERLIST_PORT", "9090")
 	t.Setenv("SERVERLIST_REJECT_PRIVATE_ADDRESSES", "yes")
+	t.Setenv("SERVERLIST_TRUST_PROXY_HEADERS", "true")
 
 	cfg, err := LoadConfig("config.scfg")
 	if err != nil {
@@ -62,6 +64,9 @@ debug true
 	}
 	if cfg.AllowUpdateWithoutOld {
 		t.Fatal("allow-update-without-old should be false")
+	}
+	if !cfg.TrustProxyHeaders {
+		t.Fatal("env override should enable TrustProxyHeaders")
 	}
 	if _, ok := cfg.BannedIPs["198.51.100.9"]; !ok {
 		t.Fatal("missing banned IP")

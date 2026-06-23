@@ -55,3 +55,38 @@ func TestListJSONHandlerServesPublicFile(t *testing.T) {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
+
+func TestRemoteIPIgnoresProxyHeadersByDefault(t *testing.T) {
+	state := &appState{config: &Config{}}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "172.18.0.2:45678"
+	req.Header.Set("X-Forwarded-For", "203.0.113.44")
+
+	if got := state.remoteIP(req); got != "172.18.0.2" {
+		t.Fatalf("remoteIP = %q, want direct peer", got)
+	}
+}
+
+func TestRemoteIPUsesTrustedForwardedHeaders(t *testing.T) {
+	state := &appState{config: &Config{TrustProxyHeaders: true}}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "172.18.0.2:45678"
+	req.Header.Set("X-Forwarded-For", "203.0.113.44, 172.18.0.2")
+	req.Header.Set("X-Real-IP", "198.51.100.9")
+
+	if got := state.remoteIP(req); got != "203.0.113.44" {
+		t.Fatalf("remoteIP = %q, want first forwarded IP", got)
+	}
+}
+
+func TestRemoteIPFallsBackToRealIPWhenForwardedForInvalid(t *testing.T) {
+	state := &appState{config: &Config{TrustProxyHeaders: true}}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "172.18.0.2:45678"
+	req.Header.Set("X-Forwarded-For", "unknown")
+	req.Header.Set("X-Real-IP", "198.51.100.9")
+
+	if got := state.remoteIP(req); got != "198.51.100.9" {
+		t.Fatalf("remoteIP = %q, want X-Real-IP", got)
+	}
+}
