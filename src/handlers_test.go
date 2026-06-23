@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -120,5 +121,38 @@ func TestLogRawAnnounceRequestRestoresBody(t *testing.T) {
 	}
 	if !strings.Contains(logs.String(), `Content-Type=["application/x-www-form-urlencoded"]`) {
 		t.Fatalf("raw log missing content type header: %s", logs.String())
+	}
+}
+
+func TestParseAnnounceFormSupportsMultipart(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("json", `{"action":"delete","address":"luanti.king.fyi","port":30000}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/announce", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := parseAnnounceForm(req); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.FormValue("json"); got != `{"action":"delete","address":"luanti.king.fyi","port":30000}` {
+		t.Fatalf("json form value = %q", got)
+	}
+}
+
+func TestParseAnnounceFormSupportsURLEncoded(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/announce", strings.NewReader("json=%7B%7D"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err := parseAnnounceForm(req); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.FormValue("json"); got != `{}` {
+		t.Fatalf("json form value = %q", got)
 	}
 }

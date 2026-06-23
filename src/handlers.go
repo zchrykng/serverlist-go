@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"sort"
@@ -65,7 +66,7 @@ func (a *appState) announce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
+	if err := parseAnnounceForm(r); err != nil {
 		a.reject(w, r, http.StatusBadRequest, "", 0, "form_parse_error", "Unable to process form data.")
 		return
 	}
@@ -186,6 +187,14 @@ func (a *appState) isServerBanned(ip string, port int, req map[string]any) bool 
 	}
 	_, ok := a.config.BannedServers[address]
 	return ok
+}
+
+func parseAnnounceForm(r *http.Request) error {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err == nil && mediaType == "multipart/form-data" {
+		return r.ParseMultipartForm(12 * 1024)
+	}
+	return r.ParseForm()
 }
 
 func (a *appState) reject(w http.ResponseWriter, r *http.Request, status int, action string, port int, reason string, text string) {
