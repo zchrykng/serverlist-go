@@ -1,0 +1,5 @@
+serverlist-go
+store.json
+list.json
+*.mmdb
+*.mmdb.gz

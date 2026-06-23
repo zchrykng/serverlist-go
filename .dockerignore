@@ -1,0 +1,9 @@
+.git
+.agents
+.codex
+server.py
+store.json
+list.json
+*.mmdb
+*.mmdb.gz
+serverlist-go
